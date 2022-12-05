@@ -1,0 +1,162 @@
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.notes {
+    font-size: 20px;
+    padding-top: 10px;
+    padding-left: 10px;
+    color: blue;
+}
+
+.flowWrap {
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    outline: none !important;
+    flex-grow: 1;
+    
+}
+
+.hoverLine {
+    z-index: 999;
+}
+
+.hoverLine path {
+    stroke: black;
+}
+
+.hoverLine path:nth-child(2) {
+    fill: black;
+}
+
+#bg {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.mouseOver {
+    background-color: red;
+}
+
+#app {
+    width: 100%;
+    height: 100%;
+}
+
+.min-height {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.pa {
+    position: absolute;
+    z-index: 1000;
+}
+
+.col-group {
+    padding-left: 0;
+    margin-bottom: 0;
+    line-height: 1.2;
+}
+
+.col-group-item {
+    border: 1px solid #ddd;
+    position: relative;
+    display: block;
+}
+
+.panel-node {
+    width: auto;
+    display: inline-block;
+    /*margin: auto 1px;*/
+    /*行内文本太长后面的就省略*/
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.panel-node-origin {
+    border: 1px solid #91c051;
+    background-color: #91c051;
+}
+
+.panel-node-middle {
+    border: 1px solid #DFC6A8;
+    background-color: #DFC6A8;
+}
+
+.panel-node-union {
+    border: 1px solid #66ccff;
+    background-color: #66ccff;
+}
+
+.panel-node-rs {
+    border: 1px solid #ff9900;
+    background-color: #ff9900;
+}
+
+.table-header {
+    text-align: center;
+    padding: 1px 15px;
+    background-color: #91c051;
+    color: white;
+    font-size: 12px;
+}
+
+
+.panel-node-list {
+    background-color: #fff;
+    padding: 1px 10px;
+    font-size: smaller;
+    /*行内文本太长后面的就省略*/
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.panel-node-list:hover {
+    background-color: #faebd7
+}
+
+/* message */
+#successTips {
+    position: absolute;
+    left: 48%;
+    top:-50px;
+    padding: 5px;
+    border-radius: 5px;
+    background-color: transparent;
+    color:transparent;
+}
+
+.showAndHide {
+    animation: showTips 1000ms cubic-bezier(0.5,0.5,1,1);
+}
+
+@keyframes showTips {
+    0%{
+        transform:translate(48%, 0px);
+        background-color: transparent;
+        color:transparent;
+    }
+    25%{
+        transform: translate(48%, 100px);
+        background-color: rgb(49,226,33);
+        color:#fff;
+    }
+    75%{
+        transform: translate(48%, 100px);
+        background-color: rgb(49,226,33);
+        color:#fff;
+    }
+    100%{
+        transform: translate(48%, 0px);
+        background-color: transparent;
+        color:transparent;
+    }
+}
