@@ -1,4 +1,5 @@
 /* global $, visoConfig, uuid,Mustache, jsPlumb,  */
+
 // jsonData = null;
 (function () {
     var area = 'bg'
@@ -7,18 +8,154 @@
         begin: 'begin-node',
         end: 'end-node'
     }
-    var firstInstance = jsPlumb.getInstance();
+
+    // 存储点击的列及其上下血缘关系节点
+    var globalClickNodes = []
+    var globalActiveNodes = null;
+    var rightId = null;
+    var rightColumn = null;
+
+    // var firstInstance = jsPlumb.getInstance();
+    jsPlumb.setContainer('bg');
     jsPlumb.ready(main)
     jsPlumb.importDefaults({
         ConnectionsDetachable: false
     });
 
-    function processData() {
+    globalData = json;
+    var originData = null;
+
+    function addEventOnMenu() {
+        var oMenu = document.getElementById("menu")
+        var ali = oMenu.getElementsByTagName("li")
+
+        for(var i = 0;i<ali.length;i++){
+            ali[i].index = i;
+            if (ali[i].id == 'copy') {
+                ali[i].onclick = function() {
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(rightColumn);
+                        toastr.info('已复制到剪切板');
+                    }
+                }
+            } else if (ali[i].id == 'reDraw') {
+                ali[i].onclick = function() {
+                    // 重绘当前血缘关系图
+                    DataDraw.clear();
+                    // 从已经保存的acitvenode中获取重新整理globalData
+                    resetData();
+                    globalClickNodes = []
+                    globalActiveNodes = null;
+                    // 重新计算位置
+                    processData(false);
+                    // debugger;
+                    DataDraw.draw(globalData);
+                    // bug fix：不知道为什么，有的时候划线会快一步，所以在这加了个一个小的延迟
+                    setTimeout(function() {
+                        jsPlumb.repaintEverything();
+                    }, 10);
+                    // jsPlumb.repaintEverything();
+                    // jsPlumb.ready(main)
+                    // jsPlumb.importDefaults({
+                    //     ConnectionsDetachable: false
+                    // });
+                }
+                
+            }
+        //     ali[i].onclick = function(){
+        //        console.log(ali[this.index].innerText)
+        //    }
+        }
+
+        // 添加button的Event
+        $('#originDraw').click(function (event) {
+            // console.log(1111)
+            DataDraw.clear();
+            // 从已经保存的acitvenode中获取重新整理globalData
+            // resetData();
+            globalData = json
+            globalClickNodes = []
+            globalActiveNodes = null;
+            // 重新计算位置
+            processData(true);
+            // debugger;
+            DataDraw.draw(globalData);
+            // bug fix：不知道为什么，有的时候划线会快一步，所以在这加了个一个小的延迟
+            setTimeout(function() {
+                jsPlumb.repaintEverything();
+            }, 10);
+            // jsPlumb.repaintEverything();
+        });
+    }
+    
+    function resetData() {
+        res = {'relations': [], 'nodes': []};
+        json.relations.forEach(function (item) {
+            if (globalActiveNodes != null) {
+                globalActiveNodes.forEach(function (activeItem) {
+                    if (item.source.parentName == activeItem.source.parentName && 
+                        item.source.column == activeItem.source.column &&
+                        item.target.parentName == activeItem.target.parentName && 
+                        item.target.column == activeItem.target.column) {
+                            //表示完全匹配线
+                            res.relations.push(item)
+                        }
+                })
+            }
+        });
+
+        json.nodes.forEach(function (item) {
+            if (globalActiveNodes != null) {
+                globalActiveNodes.forEach(function (activeItem) {
+                    var tableName = item.id;
+                    if (tableName == activeItem.source.parentName || tableName == activeItem.target.parentName) {
+                        var node = null;
+                        res.nodes.forEach(function (oneNode) {
+                            if (oneNode.id == tableName) {
+                                node = oneNode;
+                            }
+                        })
+                        if (node == null) {
+                            node = simpleClone(item);
+                            node.columns = []
+                            res.nodes.push(node);
+                        }
+                        item.columns.forEach(function (column) {
+                            var flag = false;
+                            for(var i = 0; i < node.columns.length; i++) {
+                                if (node.columns[i].name == column.name) {
+                                    flag = true; // 表示已经存入过了，不需要再存入
+                                    break;
+                                }
+                            }
+                            if (flag == false && (column.name == activeItem.source.column || column.name == activeItem.target.column)) {
+                                node.columns.push(column)
+                            }
+                        })
+                    }
+                    
+                    // if ((item.id == activeItem.source.parentName && item.name == activeItem.source.column) ||
+                    //     (item.id == activeItem.target.parentName && item.name == activeItem.target.column))
+                });
+            }
+        });
+        globalData = res;
+    }
+
+    function simpleClone(initalObj) { 
+        var obj = {}; 
+        for ( var i in initalObj) { 
+            obj[i] = initalObj[i]; 
+        } 
+        return obj; 
+    } 
+
+    function processData(originFlag) {
         var globalSave = [];
         var level = [[]]
         // 先整理源表和去向表的map
         fromSourceMap = new Map()
-        json.nodes.forEach(function (item, key) {
+        globalData.nodes.forEach(function (item, key) {
             fromSourceMap.set(item.id, {
                 'id': item.id,
                 'source': [],
@@ -27,7 +164,7 @@
                 'colLength': item.columns.length
             })
         });
-        json.relations.forEach(function (item, key) {
+        globalData.relations.forEach(function (item, key) {
             if(fromSourceMap.has(item.source.parentName)) {
                 fromSourceMap.get(item.source.parentName)['target'].push(item.target.parentName);
             }
@@ -98,14 +235,18 @@
             })
             top = 50;
             left = left - 430;
-        })
+        });
+
+        if (originFlag == true) {
+            originData = simpleClone(globalData);
+        }
     }
 
     
 
     // 设置新的画布中表的位置
     function setPosition(top, left, id) {
-        json.nodes.forEach(function (item, key) {
+        globalData.nodes.forEach(function (item, key) {
             if (item.id == id) {
                 item.top = top;
                 item.left = left;
@@ -129,10 +270,10 @@
     function setOriginPoint(id, position) {
         var config = getBaseNodeConfig()
 
-        config.isSource = true
+        // config.isSource = true
         //一个起源表的字段可能是多个RS字段的来源 这里-1不限制连线数
         config.maxConnections = -1
-        var endpoint = jsPlumb.addEndpoint(id, {
+        jsPlumb.addEndpoint(id, {
             anchors: [position || 'Right',],
             uuid: id + '-Right'
         }, config)
@@ -169,23 +310,25 @@
 
 ///////////////////////////////////////////////////
     function main() {
-        jsPlumb.setContainer('bg');
         // 先处理数据，重新计算position位置
-        processData();
+        processData(true);
         // 绘图
-        DataDraw.draw(json);
+        DataDraw.draw(globalData);
+        
         // 初始化放大缩小
         initPanZoom();
+        addEventOnMenu();
+        // jsPlumb.repaintEverything();
     }
 
 ///////////////////////////////////////////////
     var DataDraw = {
         // 核心方法
-        draw: function (json) {
+        draw: function (jsonData) {
             var $container = $(areaId)
             var that = this
             //遍历渲染所有节点
-            json.nodes.forEach(function (item, key) {
+            jsonData.nodes.forEach(function (item, key) {
                 
                 var data = {
                     id: item.id,
@@ -197,7 +340,7 @@
                 //根据不同类型的表获取各自的模板并填充数据
                 var template = that.getTemplate(item);
                 $container.append(Mustache.render(template, data));
-                //根据json数据添加表的每个列
+                //根据jsonData数据添加表的每个列
                 //将类数组对象转换为真正数组避免前端报错 XX.forEach is not a function
                 item.columns = Array.from(item.columns);
                 //将该表的所有列
@@ -212,20 +355,38 @@
                     //填充列名
                     li[0].innerText = col.name;
                     
-                    li[0].onclick=function() {
-                        var id = item.id;
-                        var columnName = col.name
-                        if (navigator.clipboard) {
-                            navigator.clipboard.writeText(columnName);
-                            toastr.info('已复制到剪切板');
-                        }
+                    // li[0].onclick=function() {
+                    //     var id = item.id;
+                    //     var columnName = col.name
+                    //     if (navigator.clipboard) {
+                    //         navigator.clipboard.writeText(columnName);
+                    //         toastr.info('已复制到剪切板');
+                    //     }
+                    // }
+                    
+                    li[0].oncontextmenu=function(event) {
+                        event.preventDefault();
+                        // 阻止浏览器的默认菜单
+                        var left = event.clientX;
+                        var top = event.clientY;
+                        oMenu.style.top = top + "px"
+                        oMenu.style.left = left + "px"
+                        oMenu.style.display = "block"
+                        // var id = item.id;
+                        // var columnName = col.name
+                        // $("#"+id+"-cols").find("#"+id+"\\."+columnName).css("background-color", "#faebd7");
+                        // $("#"+node.source.parentName+"-cols").find("#"+node.source.parentName+"\\."+node.source.column).css("background-color", "#faebd7");
+                        // 右键时也绑定click时间高亮
+                        li[0].onclick();
+                        rightColumn = col.name;
+                        rightId = col.id;
                     }
 
                     li[0].onmouseover=function (){
                         var id = item.id;
                         var columnName = col.name
                         //找到所有需要高亮的列
-                        var activeNodes = that.findActiveNode(json.relations, id, columnName);
+                        var activeNodes = that.findActiveNode(jsonData.relations, id, columnName);
                         //将所有相关列和线高亮显示
                         activeNodes.forEach(node=>{
                             var targetColumn = node.target.parentName + '.' + node.target.column;
@@ -247,24 +408,80 @@
                     li[0].onmouseout=function() {
                         var id = item.id;
                         var columnName = col.name
-                        var activeNodes = that.findActiveNode(json.relations, id, columnName);
-
+                        
+                        var activeNodes = that.findActiveNode(jsonData.relations, id, columnName);
+                        
                         //将所有相关字段恢复默认显示
+                        activeNodes.forEach(node=>{
+                            var targetColumn = node.target.parentName + '.' + node.target.column;
+                            var sourceColumn = node.source.parentName + '.' + node.source.column;
+                            if (globalClickNodes.indexOf(targetColumn) < 0 || globalClickNodes.indexOf(sourceColumn) < 0 ) {
+                                jsPlumb.selectEndpoints({ source: targetColumn }).each(function (endpoint) {
+                                    endpoint.connections.forEach(conn=> {
+                                        if (conn.sourceId == sourceColumn && conn.targetId == targetColumn) {
+                                            conn.removeClass('hoverLine');
+                                        }
+                                    })
+                                    jsPlumb.repaint(targetColumn);
+                                });
+                                if (globalClickNodes.indexOf(targetColumn) < 0) {
+                                    $("#"+node.target.parentName+"-cols").find("#"+node.target.parentName+"\\."+node.target.column).css("background-color", "#fff");
+                                }
+                                if (globalClickNodes.indexOf(sourceColumn) < 0) {
+                                    $("#"+node.source.parentName+"-cols").find("#"+node.source.parentName+"\\."+node.source.column).css("background-color", "#fff");
+                                }
+                            }
+                        })
+                    }
+
+                    li[0].onclick = function() {
+                        globalClickNodes = [];
+                        if (globalActiveNodes != null) {
+                            // 先清除之前的划线
+                            globalActiveNodes.forEach(node=>{
+                                var targetColumn = node.target.parentName + '.' + node.target.column;
+                                var sourceColumn = node.source.parentName + '.' + node.source.column;
+                                if (globalClickNodes.indexOf(targetColumn) < 0 || globalClickNodes.indexOf(sourceColumn) < 0 ) {
+                                    jsPlumb.selectEndpoints({ source: targetColumn }).each(function (endpoint) {
+                                        endpoint.connections.forEach(conn=> {
+                                            if (conn.sourceId == sourceColumn && conn.targetId == targetColumn) {
+                                                conn.removeClass('hoverLine');
+                                            }
+                                        })
+                                        jsPlumb.repaint(targetColumn);
+                                    });
+                                    $("#"+node.target.parentName+"-cols").find("#"+node.target.parentName+"\\."+node.target.column).css("background-color", "#fff");
+                                    $("#"+node.source.parentName+"-cols").find("#"+node.source.parentName+"\\."+node.source.column).css("background-color", "#fff");
+                                }
+                            })
+                        }
+                        var id = item.id;
+                        var columnName = col.name
+                        //找到所有需要高亮的列
+                        var activeNodes = that.findActiveNode(jsonData.relations, id, columnName);
+                        //将所有相关列和线高亮显示
                         activeNodes.forEach(node=>{
                             var targetColumn = node.target.parentName + '.' + node.target.column;
                             var sourceColumn = node.source.parentName + '.' + node.source.column;
                             jsPlumb.selectEndpoints({ source: targetColumn }).each(function (endpoint) {
                                 endpoint.connections.forEach(conn=> {
                                     if (conn.sourceId == sourceColumn && conn.targetId == targetColumn) {
-                                        conn.removeClass('hoverLine');
+                                        conn.addClass('hoverLine');
+                                        // conn.getPaintStyle().strokeStyle = 'black';
                                     }
                                 })
                                 jsPlumb.repaint(targetColumn);
                             });
-                            $("#"+node.target.parentName+"-cols").find("#"+node.target.parentName+"\\."+node.target.column).css("background-color", "#fff");
-                            $("#"+node.source.parentName+"-cols").find("#"+node.source.parentName+"\\."+node.source.column).css("background-color", "#fff");
-                        })
+                            //注意 . 的转义，参考 https://blog.csdn.net/qq_44831907/article/details/120899676
+                            $("#"+node.target.parentName+"-cols").find("#"+node.target.parentName+"\\."+node.target.column).css("background-color", "#faebd7");
+                            $("#"+node.source.parentName+"-cols").find("#"+node.source.parentName+"\\."+node.source.column).css("background-color", "#faebd7");
+                            // 将节点的信息存入global中
+                            globalClickNodes.push(node.target.parentName+"."+node.target.column);
+                            globalClickNodes.push(node.source.parentName+"."+node.source.column);
+                        });
+                        globalActiveNodes = activeNodes;
                     }
+
                     ul.append(li);
                 });
                 //根据节点类型找到不同模板各自的 添加端点 方法
@@ -273,7 +490,8 @@
                 }
             });
             //模板渲染好了、锚点也设置好了，最后根据关系连线
-            this.finalConnect(json.nodes, json.relations)
+            this.finalConnect(jsonData.nodes, jsonData.relations);
+            // jsPlumb.repaintEverything();
         },
 
         //根据关系连线
@@ -296,8 +514,8 @@
 
                                 //终于连线了！
                                 that.connectEndpoint(sourceUUID, targetUUID);
-
-
+                                jsPlumb.revalidate(nodeName);
+                                // jsPlumb.repaint(nodeName);
                                 //鼠标移动到连接线上后，两边的列高亮的效果利用jsPlumb事件实现
                                 //jsPlumb的事件doc https://github.com/jsplumb/jsplumb/blob/da6688b86fbfba621bf3685e4431a4d9be7213b4/doc/wiki/events.md
                                 jsPlumb.unbind('mouseover')
@@ -334,16 +552,22 @@
                                     activeNodes.forEach(node=>{
                                         var targetColumn = node.target.parentName + '.' + node.target.column;
                                         var sourceColumn = node.source.parentName + '.' + node.source.column;
-                                        jsPlumb.selectEndpoints({ source: targetColumn }).each(function (endpoint) {
-                                            endpoint.connections.forEach(conn=> {
-                                                if (conn.sourceId == sourceColumn && conn.targetId == targetColumn) {
-                                                    conn.removeClass('hoverLine');
-                                                }
-                                            })
-                                            jsPlumb.repaint(targetColumn);
-                                        });
-                                        $("#"+node.target.parentName+"-cols").find("#"+node.target.parentName+"\\."+node.target.column).css("background-color", "#fff");
-                                        $("#"+node.source.parentName+"-cols").find("#"+node.source.parentName+"\\."+node.source.column).css("background-color", "#fff");
+                                        if (globalClickNodes.indexOf(targetColumn) < 0 || globalClickNodes.indexOf(sourceColumn) < 0 ) {
+                                            jsPlumb.selectEndpoints({ source: targetColumn }).each(function (endpoint) {
+                                                endpoint.connections.forEach(conn=> {
+                                                    if (conn.sourceId == sourceColumn && conn.targetId == targetColumn) {
+                                                        conn.removeClass('hoverLine');
+                                                    }
+                                                })
+                                                jsPlumb.repaint(targetColumn);
+                                            });
+                                            if (globalClickNodes.indexOf(targetColumn) < 0) {
+                                                $("#"+node.target.parentName+"-cols").find("#"+node.target.parentName+"\\."+node.target.column).css("background-color", "#fff");
+                                            }
+                                            if (globalClickNodes.indexOf(sourceColumn) < 0) {
+                                                $("#"+node.source.parentName+"-cols").find("#"+node.source.parentName+"\\."+node.source.column).css("background-color", "#fff");
+                                            }
+                                        }
                                     })
                                 });
                             }
@@ -428,6 +652,27 @@
         getTemplate: function (node) {
             return $('#tpl-' + node.type).html();
         },
+
+        clear: function() {
+            // var c = document.getElementById('bg');
+            // var cxt = c.getContext("2d");
+            // cxt.clearRect(0,0,c.width, c.height);
+            // jsPlumb.detachEveryConnection();
+            // jsPlumb.deleteEveryConnection();
+            
+            
+            globalData.nodes.forEach((node)=>{
+                // jsPlumb.remove(node.id + '-' + 'col');
+                jsPlumb.remove(node.id);
+            });
+            // jsPlumb.repaintEverything();
+            jsPlumb.deleteEveryEndpoint();
+            jsPlumb.detachEveryConnection();
+            // jsPlumb.repaintEverything()
+            // $('#bg').html('');
+            // jsPlumb.anchorManager.reset();
+            // jsPlumb.reset()
+        }
     }
 
     function initPanZoom() {

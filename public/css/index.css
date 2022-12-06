@@ -5,6 +5,8 @@ html, body {
 }
 
 .notes {
+    float: right;
+    margin-right: 10px;
     font-size: 20px;
     padding-top: 10px;
     padding-left: 10px;
@@ -159,4 +161,37 @@ html, body {
         background-color: transparent;
         color:transparent;
     }
+}
+
+#menu{
+    width: 200px;
+    /* padding: 5px auto; */
+    border-radius: 5px;
+    background: #fff;
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    cursor: pointer;
+    padding-left: 0px;
+    display: none;
+    border-style: outset;
+}
+#menu>li{
+    list-style: none;
+    height: 30px;
+    width: 100%;
+    text-align: center;
+    line-height: 30px;
+}
+#menu>li:hover{
+    background: gray;
+    color:white;
+}
+#menu>.list{
+    border-bottom: 1px solid white;
+}
+
+.btn-class {
+    margin-left: 10px;
+    margin-top: 10px;
 }

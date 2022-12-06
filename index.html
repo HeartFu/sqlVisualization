@@ -15,10 +15,19 @@
 
 <body>
 <div id="app">
-    <div class="notes">PS: 点击列名可以复制到剪切板中</div>
+    <!-- <div class="notes">PS: 点击列名可以复制到剪切板中</div> -->
+    <div>
+        <button id="originDraw" class="btn btn-success btn-class">返回初始血缘图</button>
+        <span class="notes">PS: 右键单击列名可进行菜单选择</span>
+    </div>
     <div id="flowWrap" class="flowWrap">
         <div class="min-height" id="bg" oncontextmenu="return false" ></div>
     </div>
+    <!-- 鼠标右键 -->
+    <ul id ="menu">
+        <li class="list" id="copy">复制</li>
+        <li class="list" id="reDraw">单独显示当前节点血缘关系</li>
+    </ul>
 
 </div>
 <!--不同类型表的渲染模板-->
@@ -150,6 +159,26 @@
 
         return (S4() + S4() + S4() + S4() + S4() + S4() + S4() + S4());
     }
+
+    var oMenu = document.getElementById("menu")
+
+    // document.oncontextmenu = function(event){
+    //     event.preventDefault();
+    //     // 阻止浏览器的默认菜单
+    //     var left = event.clientX;
+    //     var top = event.clientY;
+    //     oMenu.style.top = top + "px"
+    //     oMenu.style.left = left + "px"
+    //     oMenu.style.display = "block"
+
+    // }
+
+    document.onclick = function(){
+        oMenu.style.display = "none";
+        // 单击鼠标消失
+    }
+
+
 
 </script>
 </body>
